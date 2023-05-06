@@ -3,16 +3,12 @@
 #include <math.h>
 using namespace std;
 using namespace sf;
-RenderWindow window(VideoMode(600,400), "ARKANOID");
-CircleShape ball;
-const float speedBall=1;
-const float fastSpeedBall=1.5;
-const float speedVaus=2;
-Vector2f ballDirMove(-speedBall,-speedBall);
-RectangleShape vaus;
-const int wallRow=5;
-const int wallCol=10;
-RectangleShape wall[wallRow][wallCol];
+
+//ball
+#define speedBall 1
+#define fastSpeedBall 1.5
+//vaus
+#define speedVaus 2
 enum BlockSide {
     None,
     Top,
@@ -21,210 +17,121 @@ enum BlockSide {
     Bottom
 };
 
-BlockSide checkCollision(const CircleShape& ball, const RectangleShape& block)
-{
-    FloatRect ballBounds = ball.getGlobalBounds();
-    FloatRect blockBounds = block.getGlobalBounds();
-
-    if (ballBounds.intersects(blockBounds)) {
-        if (ball.getPosition().y + ball.getRadius() > block.getPosition().y - block.getSize().y / 2) {
-            return BlockSide::Top;
-        }
-        else if (ball.getPosition().x + ball.getRadius() > block.getPosition().x + block.getSize().x / 2) {
-            return BlockSide::Right;
-        }
-        else if (ball.getPosition().x - ball.getRadius() < block.getPosition().x - block.getSize().x / 2) {
-            return BlockSide::Left;
-        }
-        else if (ball.getPosition().y - ball.getRadius() < block.getPosition().y + block.getSize().y/2) {
-            return BlockSide::Bottom;
-        }
-        else {
-            return BlockSide::None;
+class Ball{
+private:
+    CircleShape shape;
+    Vector2f dirMove;
+public:
+    Ball(float radius,const RenderWindow& window){
+        shape=CircleShape(radius);
+        shape.setOrigin(radius/2,radius/2);
+        shape.setFillColor(Color::Magenta);
+        shape.setPosition(window.getSize().x/2,window.getSize().y/2);
+        dirMove=Vector2f(-speedBall,-speedBall);
+    }
+    void draw(RenderWindow& window){
+        window.draw(shape);
+    }
+    void move(){
+        shape.move(dirMove);
+    }
+};
+class Block{
+protected:
+    RectangleShape shape;
+    bool appear;
+public:
+    Block(Vector2f size, Color color,bool appear=true){
+        shape=RectangleShape(size);
+        shape.setFillColor(color);
+        shape.setOrigin(shape.getSize().x/2,shape.getSize().y/2);
+        this->appear=appear;
+    }
+    void draw(RenderWindow& window){
+        if (appear){
+            window.draw(shape);
         }
     }
+    BlockSide checkCollision(const CircleShape& ball){
+        FloatRect ballBounds = ball.getGlobalBounds();
+        FloatRect blockBounds = shape.getGlobalBounds();
 
-    return BlockSide::None;
-}
+        if (blockBounds.intersects(ballBounds)) {
+            if (ball.getPosition().y + ball.getRadius() > shape.getPosition().y - shape.getSize().y / 2) {
+                return BlockSide::Bottom;
+            }
+            else if (ball.getPosition().x + ball.getRadius() > shape.getPosition().x + shape.getSize().x / 2) {
+                return BlockSide::Right;
+            }
+            else if (ball.getPosition().x - ball.getRadius() < shape.getPosition().x - shape.getSize().x / 2) {
+                return BlockSide::Left;
+            }
+            else if (ball.getPosition().y - ball.getRadius() < shape.getPosition().y + shape.getSize().y/2) {
+                return BlockSide::Top;
+            }
+            else {
+                return BlockSide::None;
+            }
+        }
 
-bool collisionCenterBlock(const CircleShape& ball, const RectangleShape& block)
-{
-    if (abs(ball.getPosition().x - block.getPosition().x) < block.getSize().x / 4) {
-        return true;
+        return BlockSide::None;
     }
-    else {
-        return false;
+};
+class Vaus: public Block{
+public:
+    Vaus(Vector2f size,RenderWindow& window):Block(size,Color::Cyan){
+        shape.setPosition(window.getSize().x/2,window.getSize().y*0.85);
     }
-
-    return false;
-}
-
-void loseGame(){
-    Font font;
-    font.loadFromFile("fonts/Sigmar-Regular.ttf"); // replace with your own font file
-
-    Text text("You lose the game!", font, 50);
-    text.setPosition(window.getSize().x / 2 - text.getLocalBounds().width / 2, window.getSize().y / 2 - text.getLocalBounds().height / 2);
-    text.setFillColor(Color::Green);
-    window.clear();
-    window.draw(text);
-    window.display();
-    sleep(seconds(3));
-}
-void winGame(){
-    Font font;
-    font.loadFromFile("fonts/Sigmar-Regular.ttf"); // replace with your own font file
-
-    Text text("You win!", font, 50);
-    text.setPosition(window.getSize().x / 2 - text.getLocalBounds().width / 2, window.getSize().y / 2 - text.getLocalBounds().height / 2);
-    text.setFillColor(Color::Green);
-    window.clear();
-    window.draw(text);
-    window.display();
-    sleep(seconds(3));
-}
-
-int main()
-{
-    //window
-    
-    window.setFramerateLimit(200);
-    //ball
-    ball=CircleShape(5.f);
-    ball.setOrigin(2.5f,2.5f);
-    ball.setFillColor(Color::Magenta);
-    ball.setPosition(window.getSize().x/2,window.getSize().y/2);
-    //vaus
-    vaus=RectangleShape(Vector2f(window.getSize().x/3,10)); 
-    vaus.setFillColor(Color::Cyan);
-    vaus.setPosition(window.getSize().x/2,window.getSize().y*0.85);
-    vaus.setOrigin(vaus.getSize().x/2,vaus.getSize().y/2);
-    //wall
-    bool appear[wallRow][wallCol];
-    for (int row = 0; row < wallRow; ++row) {
-        for (int col = 0; col < wallCol; ++col) {
-            RectangleShape rect(Vector2f(window.getSize().x / wallCol, window.getSize().y / 3/wallRow));
-            rect.setFillColor(Color::Blue);
-            rect.setOutlineThickness(1.f);
-            rect.setOutlineColor(Color::Cyan);
-            rect.setOrigin(rect.getSize() / 2.f);
-            rect.setPosition((col + 0.5f) * rect.getSize().x, (row + 0.5f) * rect.getSize().y);
-            wall[row][col] = rect;
-            appear[row][col]=true;
-        }
+    void moveLeft(){
+        shape.move(-speedVaus,0);
     }
-
-    while (window.isOpen())
-    {
-        Event event;
-        while (window.pollEvent(event))
-        {
-            if(event.type == Event::Closed){
-                window.close();
-            }
-        }
-        if(ball.getPosition().x>=window.getSize().x || ball.getPosition().x <=0){
-            ballDirMove.x*=-1;
-        }
-        if(ball.getPosition().y<=0 ){
-            ballDirMove.y*=-1;
-        }
-        if(ball.getPosition().y>=window.getSize().y){
-            loseGame();
-            return 0;
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Right)){
-            if (vaus.getPosition().x<window.getSize().x-vaus.getSize().x/2){
-                vaus.move(speedVaus,0);
-            }
-        }
-        if (Keyboard::isKeyPressed(Keyboard::Left)){
-            if (vaus.getPosition().x>=vaus.getSize().x/2){
-                vaus.move(-speedVaus,0);
-            }
-        }
-        for(int row=0;row<wallRow;row++){
-            for(int col=0;col<wallCol;col++){
-                if(appear[row][col]){
-                    if (checkCollision(ball,wall[row][col])) appear[row][col]=false;
-                    switch (checkCollision(ball,wall[row][col])){
-                        case BlockSide::Top:
-                            ballDirMove.y*=-1;
-                            break;
-                        case BlockSide::Left:
-                            ballDirMove.x*=-1;
-                            break;
-                        case BlockSide::Right:
-                            // handle right collision
-                            ballDirMove.x*=-1;
-                            break;
-                        case BlockSide::Bottom:
-                            ballDirMove.y*=-1;
-                            break;
-                        case BlockSide::None:
-                            // handle no collision
-                            break;
-                    }
-                }
-            }
-        }
-        switch (checkCollision(ball,vaus)){
-            case BlockSide::Top:
-                if (collisionCenterBlock(ball,vaus)){
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*speedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*-speedBall;
-                }
-                else{
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*fastSpeedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*-fastSpeedBall;
-                }
-                break;
-            case BlockSide::Left:
-                // handle left collision
-                if (collisionCenterBlock(ball,vaus)){
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*-speedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*speedBall;
-                }
-                else{
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*-fastSpeedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*fastSpeedBall;
-                }
-                break;
-            case BlockSide::Right:
-                // handle right collision
-                if (collisionCenterBlock(ball,vaus)){
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*-speedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*speedBall;
-                }
-                else{
-                    ballDirMove.x=ballDirMove.x/abs(ballDirMove.x)*-fastSpeedBall;
-                    ballDirMove.y=ballDirMove.y/abs(ballDirMove.y)*fastSpeedBall;
-                }
-                break;
-            case BlockSide::Bottom:
-            case BlockSide::None:
-                // handle no collision
-                break;
-        }
-        ball.move(ballDirMove.x,ballDirMove.y);
+    void moveRight(){
+        shape.move(speedVaus,0);
+    }
+};
+class Wall:public Block{
+public:
+    Wall(Vector2f size): Block(size,Color::Blue){
+        shape.setOutlineColor(Color::Green);
+        shape.setOutlineThickness(2);
+    }
+    BlockSide checkCollision()
+};
+class Game{
+private:
+    RenderWindow window;
+    Ball ball;
+    Vaus vaus;
+public:
+    Game(): window(VideoMode(600, 400), "ARKANOID"),
+    ball(5.f,window),
+    vaus(Vector2f(window.getSize().x/6,10),window) {
+        // initialize ball and vaus objects here, if needed
+        window.setFramerateLimit(100);
+    }
+    void draw(){
         window.clear();
-        window.draw(ball);
-        window.draw(vaus);
-        bool win=true;
-        for(int row=0;row<wallRow;row++){
-            for(int col=0;col<wallCol;col++){
-                if (appear[row][col]) {
-                    window.draw(wall[row][col]);
-                    win=false;
+        ball.draw(window);
+        vaus.draw(window);
+        window.display();
+    }
+    void run(){
+        while (window.isOpen())
+        {
+            Event event;
+            while (window.pollEvent(event))
+            {
+                if(event.type == Event::Closed){
+                    window.close();
                 }
             }
+            draw();
         }
-        if (win){
-            winGame();
-        }
-        window.display();
-        
     }
-
+};
+int main(){
+    
+    Game game;
+    game.run();
     return 0;
 }
